@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Sports | Elite Performance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(17, 24, 39, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-glow: rgba(59, 130, 246, 0.5);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a, #020617);
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .item-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .item-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.05),
+                    transparent);
+            transition: 0.5s;
+        }
+
+        .item-card:hover::before {
+            left: 100%;
+        }
+
+        .item-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px var(--accent-glow);
+            background: rgba(30, 41, 59, 0.6);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+            filter: brightness(1.1);
+        }
+
+        .cart-item {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .pulse-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #3b82f6;
+            border-radius: 2.5rem;
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+            pointer-events: none;
+            display: none;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.1);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="selection:bg-blue-500 selection:text-white">
+
+    <!-- NAVBAR -->
+    <nav class="glass sticky top-0 z-50 px-8 py-5 border-b border-white/10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div
+                    class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/50">
+                    <span class="text-xl">G</span>
+                </div>
+                <h1 class="text-2xl font-black tracking-widest text-white uppercase italic">
+                    Gravity <span class="text-blue-500">Sports</span>
+                </h1>
+            </div>
+            <div class="flex items-center space-x-6">
+                <div id="connection-status" class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Offline</span>
+                </div>
+                <button class="btn-primary text-white px-8 py-3 rounded-2xl font-bold flex items-center space-x-2">
+                    <span>🛒</span>
+                    <span>Cart</span>
+                    <span id="cart-count" class="bg-white/20 px-2 py-0.5 rounded-lg text-sm ml-2">0</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-16 grid lg:grid-cols-3 gap-12">
+
+        <!-- PRODUCTS -->
+        <div class="lg:col-span-2">
+            <div class="flex items-center space-x-4 mb-12">
+                <div class="h-1 w-12 bg-blue-500 rounded-full"></div>
+                <h2 class="text-4xl font-extrabold text-white tracking-tight">Elite Collection</h2>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div onclick="addToCart('Football Jersey', 25000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">⚽</div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Football Jersey</h3>
+                    <p class="text-blue-400 font-black text-xl">25,000 RWF</p>
+                </div>
+
+                <div onclick="addToCart('Running Shoes', 85000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">👟
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Running Shoes</h3>
+                    <p class="text-blue-400 font-black text-xl">85,000 RWF</p>
+                </div>
+
+                <div onclick="addToCart('Goalkeeper Gloves', 30000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">🧤
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Goalkeeper Gloves</h3>
+                    <p class="text-blue-400 font-black text-xl">30,000 RWF</p>
+                </div>
+
+                <div onclick="addToCart('Sports Tracksuit', 60000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">🏃
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Sports Tracksuit</h3>
+                    <p class="text-blue-400 font-black text-xl">60,000 RWF</p>
+                </div>
+
+                <div onclick="addToCart('Basketball Kit', 40000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">🏀
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Basketball Kit</h3>
+                    <p class="text-blue-400 font-black text-xl">40,000 RWF</p>
+                </div>
+
+                <div onclick="addToCart('Training Shorts', 20000)"
+                    class="item-card p-8 rounded-3xl text-center cursor-pointer group">
+                    <div class="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-300">🩳
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-200 mb-2">Training Shorts</h3>
+                    <p class="text-blue-400 font-black text-xl">20,000 RWF</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <div class="space-y-10 lg:sticky lg:top-32 h-fit">
+
+            <!-- CARD IDENTITY -->
+            <div class="glass rounded-[2.5rem] p-8 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[60px] rounded-full"></div>
+                <div class="flex justify-between items-start mb-6">
+                    <h2 class="text-lg font-bold text-white uppercase tracking-widest">Card Identity</h2>
+                    <div class="status-badge bg-blue-500/20 text-blue-400 border border-blue-500/30">NFC Active</div>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest font-black mb-1">Current Holder
+                            UID</p>
+                        <p id="card-uid" class="text-xl font-mono font-bold text-slate-200 tracking-wider">NO CARD
+                            DETECTED</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest font-black mb-1">Available
+                            Credits</p>
+                        <p class="text-4xl font-black text-blue-500 glow-text"><span id="card-balance">0</span> <span
+                                class="text-xs">RWF</span></p>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-white/5">
+                    <p class="text-[10px] text-slate-500 uppercase tracking-widest font-black mb-3">Quick Top-up</p>
+                    <div class="flex space-x-2">
+                        <input type="number" id="topup-amount" placeholder="Amount"
+                            class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 w-full text-white">
+                        <button onclick="sendTopup()"
+                            class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CART -->
+            <div id="cart-container" class="glass rounded-[2.5rem] p-8 relative overflow-hidden">
+                <div id="checkout-pulse" class="pulse-ring"></div>
+                <h2 class="text-lg font-bold text-white mb-6 uppercase tracking-widest border-b border-white/5 pb-4">
+                    Executive Cart</h2>
+
+                <div id="cart-list" class="space-y-4 mb-8 max-h-[300px] overflow-y-auto pr-2">
+                    <div class="py-8 text-center">
+                        <div class="text-3xl opacity-20 mb-3">🛒</div>
+                        <p class="text-slate-500 text-sm">Cart is empty</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-white/5 pt-6">
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Order Total
+                            </p>
+                            <p class="text-2xl font-black text-white"><span id="total-val">0</span> <span
+                                    class="text-blue-500 text-xs font-bold ml-1">RWF</span></p>
+                        </div>
+                    </div>
+
+                    <button id="checkout-btn" onclick="startCheckout()"
+                        class="w-full btn-primary text-white py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all">
+                        Complete Order
+                    </button>
+
+                    <button onclick="clearCart()"
+                        class="w-full mt-4 text-slate-500 hover:text-red-400 font-bold text-[10px] tracking-widest uppercase transition-colors">
+                        Reset Cart
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let cart = [];
+        let total = 0;
+        let currentUID = null;
+
+        // --- SOCKET.IO HANDLING ---
+        socket.on('connect', () => {
+            document.getElementById('connection-status').innerHTML = `
+            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span class="text-[10px] uppercase tracking-widest text-green-500 font-bold">Online</span>
+        `;
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('connection-status').innerHTML = `
+            <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Offline</span>
+        `;
+        });
+
+        socket.on('card_tapped', (data) => {
+            currentUID = data.uid;
+            document.getElementById('card-uid').innerText = data.uid;
+            document.getElementById('card-balance').innerText = (data.balance || 0).toLocaleString();
+
+            // Visual feedback for tap
+            const cardDisplay = document.getElementById('card-uid').parentElement.parentElement;
+            cardDisplay.classList.add('scale-105', 'border-blue-500/50');
+            setTimeout(() => cardDisplay.classList.remove('scale-105', 'border-blue-500/50'), 300);
+        });
+
+        socket.on('checkout_result', (data) => {
+            const btn = document.getElementById('checkout-btn');
+            const ring = document.getElementById('checkout-pulse');
+
+            btn.disabled = false;
+            ring.style.display = 'none';
+
+            if (data.status === 'success') {
+                alert(`✨ PAYMENT SUCCESSFUL!\nUID: ${data.uid}\nNew Balance: ${data.new_balance.toLocaleString()} RWF`);
+                clearCart();
+                // Update balance locally
+                document.getElementById('card-balance').innerText = data.new_balance.toLocaleString();
+            } else {
+                alert(`❌ PAYMENT FAILED\nInsufficient Balance.\nNeeded: ${data.needed.toLocaleString()} RWF`);
+                btn.innerText = "COMPLETE ORDER";
+            }
+        });
+
+        // --- UI LOGIC ---
+        function addToCart(name, price) {
+            cart.push({ name, price, id: Date.now() });
+            updateCart();
+        }
+
+        function clearCart() {
+            cart = [];
+            updateCart();
+            const btn = document.getElementById('checkout-btn');
+            btn.innerText = "COMPLETE ORDER";
+            btn.disabled = false;
+            document.getElementById('checkout-pulse').style.display = 'none';
+        }
+
+        function updateCart() {
+            const list = document.getElementById("cart-list");
+            total = cart.reduce((sum, item) => sum + item.price, 0);
+            document.getElementById("total-val").innerText = total.toLocaleString();
+            document.getElementById("cart-count").innerText = cart.length;
+
+            if (cart.length === 0) {
+                list.innerHTML = `
+                <div class="py-12 text-center">
+                    <div class="text-3xl opacity-20 mb-3">🛒</div>
+                    <p class="text-slate-500 text-sm">Cart is empty</p>
+                </div>
+            `;
+                return;
+            }
+
+            list.innerHTML = cart.map(item => `
+            <div class="cart-item flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                <div class="flex flex-col">
+                    <span class="text-slate-100 font-bold text-sm">${item.name}</span>
+                    <span class="text-blue-400 text-[10px] font-black uppercase tracking-tighter">${item.price.toLocaleString()} RWF</span>
+                </div>
+                <button onclick="removeItem(${item.id})" class="text-slate-500 hover:text-red-400 transition-colors p-2 text-xs">✕</button>
+            </div>
+        `).join('');
+        }
+
+        function removeItem(id) {
+            cart = cart.filter(item => item.id !== id);
+            updateCart();
+        }
+
+        // --- API CALLS ---
+        async function startCheckout() {
+            if (total === 0) return alert("Select elite gear to continue.");
+
+            const btn = document.getElementById('checkout-btn');
+            const ring = document.getElementById('checkout-pulse');
+
+            btn.innerText = "TAP CARD TO PAY...";
+            btn.disabled = true;
+            ring.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: total })
+                });
+                const data = await response.json();
+                console.log("Checkout status:", data.status);
+            } catch (err) {
+                alert("Error initiating checkout. Is the server running?");
+                btn.innerText = "COMPLETE ORDER";
+                btn.disabled = false;
+                ring.style.display = 'none';
+            }
+        }
+
+        async function sendTopup() {
+            const amount = document.getElementById('topup-amount').value;
+            if (!amount || !currentUID) return alert("Please tap a card and enter an amount.");
+
+            try {
+                const response = await fetch('/api/topup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: currentUID, amount: parseInt(amount) })
+                });
+                const data = await response.json();
+                if (data.status === 'command_sent') {
+                    alert("Top-up request sent! Tap your card on the reader.");
+                    document.getElementById('topup-amount').value = '';
+                }
+            } catch (err) {
+                alert("Error sending top-up. Is the server running?");
+            }
+        }
+    </script>
+
+</body>
+
+</html>
